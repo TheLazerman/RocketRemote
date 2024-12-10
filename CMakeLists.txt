@@ -1,4 +1,6 @@
-SET(SOURCES ui_Screen1.c
+SET(SOURCES ui_LiveDataScreen.c
+    ui_ResultsScreen.c
+    ui_DisconnectScreen.c
     ui_theme_manager.c
     ui_themes.c
     ui.c

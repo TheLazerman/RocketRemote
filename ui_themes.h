@@ -15,16 +15,14 @@ extern "C" {
 
 #define UI_THEME_DEFAULT 0
 
-#define UI_THEME_TELEMETRY 1
+extern const ui_theme_variable_t _ui_theme_color_Red[1];
+extern const ui_theme_variable_t _ui_theme_alpha_Red[1];
 
-extern const ui_theme_variable_t _ui_theme_color_Red[2];
-extern const ui_theme_variable_t _ui_theme_alpha_Red[2];
+extern const ui_theme_variable_t _ui_theme_color_Green[1];
+extern const ui_theme_variable_t _ui_theme_alpha_Green[1];
 
-extern const ui_theme_variable_t _ui_theme_color_Green[2];
-extern const ui_theme_variable_t _ui_theme_alpha_Green[2];
-
-extern const uint32_t* ui_theme_colors[2];
-extern const uint8_t* ui_theme_alphas[2];
+extern const uint32_t* ui_theme_colors[1];
+extern const uint8_t* ui_theme_alphas[1];
 extern uint8_t ui_theme_idx;
 
 void ui_theme_set(uint8_t theme_idx);

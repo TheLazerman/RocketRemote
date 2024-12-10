@@ -27,13 +27,11 @@ extern "C" {
 #include "ui_theme_manager.h"
 #include "ui_themes.h"
 
-// SCREEN: ui_Screen1
-void ui_Screen1_screen_init(void);
-extern lv_obj_t *ui_Screen1;
+// SCREEN: ui_LiveDataScreen
+void ui_LiveDataScreen_screen_init(void);
+extern lv_obj_t *ui_LiveDataScreen;
 extern lv_obj_t *ui_ThrustChart1;
 extern lv_obj_t *ui_ChartYLabel;
-extern lv_obj_t *ui_DisconnectAlert;
-extern lv_obj_t *ui_Label1;
 extern lv_obj_t *ui_ResultsPanel;
 extern lv_obj_t *ui_MaxThrustLabel;
 extern lv_obj_t *ui_MaxThrustValue;
@@ -41,6 +39,26 @@ extern lv_obj_t *ui_ImpulseLabel;
 extern lv_obj_t *ui_ImpulseValue;
 extern lv_obj_t *ui_AvgThrustLabel;
 extern lv_obj_t *ui_AvgThrustValue;
+// SCREEN: ui_ResultsScreen
+void ui_ResultsScreen_screen_init(void);
+extern lv_obj_t *ui_ResultsScreen;
+extern lv_obj_t *ui_FinalResultsPanel;
+extern lv_obj_t *ui_MaxThrustLabelFinal;
+extern lv_obj_t *ui_MaxThrustValueFinal;
+extern lv_obj_t *ui_AvgThrustLabelFinal;
+extern lv_obj_t *ui_AvgThrustValueFinal;
+extern lv_obj_t *ui_ImpulseLabelFinal;
+extern lv_obj_t *ui_ImpulseValueFinal;
+extern lv_obj_t *ui_MotorClassificationValue;
+extern lv_obj_t *ui_BurnDurationLabel;
+extern lv_obj_t *ui_BurnDurationValue;
+extern lv_obj_t *ui_ThrustChartFinal;
+// SCREEN: ui_DisconnectScreen
+void ui_DisconnectScreen_screen_init(void);
+extern lv_obj_t *ui_DisconnectScreen;
+extern lv_obj_t *ui_DisconnectPanel;
+extern lv_obj_t *ui_DisconnectLabel;
+void ui_event____initial_actions0( lv_event_t * e);
 extern lv_obj_t *ui____initial_actions0;
 
 

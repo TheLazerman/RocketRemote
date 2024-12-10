@@ -9,13 +9,11 @@
 ///////////////////// VARIABLES ////////////////////
 
 
-// SCREEN: ui_Screen1
-void ui_Screen1_screen_init(void);
-lv_obj_t *ui_Screen1;
+// SCREEN: ui_LiveDataScreen
+void ui_LiveDataScreen_screen_init(void);
+lv_obj_t *ui_LiveDataScreen;
 lv_obj_t *ui_ThrustChart1;
 lv_obj_t *ui_ChartYLabel;
-lv_obj_t *ui_DisconnectAlert;
-lv_obj_t *ui_Label1;
 lv_obj_t *ui_ResultsPanel;
 lv_obj_t *ui_MaxThrustLabel;
 lv_obj_t *ui_MaxThrustValue;
@@ -23,6 +21,30 @@ lv_obj_t *ui_ImpulseLabel;
 lv_obj_t *ui_ImpulseValue;
 lv_obj_t *ui_AvgThrustLabel;
 lv_obj_t *ui_AvgThrustValue;
+
+
+// SCREEN: ui_ResultsScreen
+void ui_ResultsScreen_screen_init(void);
+lv_obj_t *ui_ResultsScreen;
+lv_obj_t *ui_FinalResultsPanel;
+lv_obj_t *ui_MaxThrustLabelFinal;
+lv_obj_t *ui_MaxThrustValueFinal;
+lv_obj_t *ui_AvgThrustLabelFinal;
+lv_obj_t *ui_AvgThrustValueFinal;
+lv_obj_t *ui_ImpulseLabelFinal;
+lv_obj_t *ui_ImpulseValueFinal;
+lv_obj_t *ui_MotorClassificationValue;
+lv_obj_t *ui_BurnDurationLabel;
+lv_obj_t *ui_BurnDurationValue;
+lv_obj_t *ui_ThrustChartFinal;
+
+
+// SCREEN: ui_DisconnectScreen
+void ui_DisconnectScreen_screen_init(void);
+lv_obj_t *ui_DisconnectScreen;
+lv_obj_t *ui_DisconnectPanel;
+lv_obj_t *ui_DisconnectLabel;
+void ui_event____initial_actions0( lv_event_t * e);
 lv_obj_t *ui____initial_actions0;
 
 ///////////////////// TEST LVGL SETTINGS ////////////////////
@@ -36,6 +58,12 @@ lv_obj_t *ui____initial_actions0;
 ///////////////////// ANIMATIONS ////////////////////
 
 ///////////////////// FUNCTIONS ////////////////////
+void ui_event____initial_actions0( lv_event_t * e) {
+//     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+// if ( event_code == LV_EVENT_SCREEN_LOAD_START) {
+//       CheckConnctionStatus( e );
+// }
+}
 
 ///////////////////// SCREENS ////////////////////
 
@@ -44,7 +72,12 @@ void ui_init( void )
 lv_disp_t *dispp = lv_disp_get_default();
 lv_theme_t *theme = lv_theme_default_init(dispp, lv_palette_main(LV_PALETTE_BLUE), lv_palette_main(LV_PALETTE_RED), true, LV_FONT_DEFAULT);
 lv_disp_set_theme(dispp, theme);
-ui_Screen1_screen_init();
+ui_LiveDataScreen_screen_init();
+ui_ResultsScreen_screen_init();
+ui_DisconnectScreen_screen_init();
 ui____initial_actions0 = lv_obj_create(NULL);
-lv_disp_load_scr( ui_Screen1);
+lv_obj_add_event_cb(ui____initial_actions0, ui_event____initial_actions0, LV_EVENT_ALL, NULL);
+
+lv_disp_load_scr(ui____initial_actions0);
+lv_disp_load_scr( ui_LiveDataScreen);
 }

@@ -5,6 +5,8 @@
 #include <vector>
 #include <numeric>
 #include <cmath>
+#include <array>
+#include <deque>
 
 // Structure example to receive data
 // Must match the sender structure
@@ -24,12 +26,16 @@ typedef struct struct_command {
 struct_command testStandCommands;
 esp_now_peer_info_t peerInfo;
 
+// MAC Address of the Teststand ESP Device
 uint8_t broadcastAddress[] = { 0xb4, 0xe6, 0x2d, 0x69, 0xd6, 0xa0 };
 
+// IO Definitions
 #define safeLED 1
 #define armedLED 2
 #define armingButton 3
 #define ignitionButton 10
+
+
 
 long lastMillis = 0;
 long lastMsg = 0;
@@ -38,31 +44,41 @@ long debounce = 0;
 bool armed = false;
 bool eventInProgress = false;
 bool eventOccurred = false;
-bool done = false;
+bool eventComplete = false;
+bool standConnected = false;
 
-double maxThrust = 0;
-double lastThrust = 0;
-double avgThrust = 0;
-double totalImpulse = 0;
-double rateOfChange = 0;
+float maxThrust = 0;
+float lastThrust = 0;
+float avgThrust = 0;
+float totalImpulse = 0;
+float rateOfChange = 0;
 
-double eventStartThreshold = 0.03;
-double eventStopThreshold = 0.04;
-int windowSize = 3;
-
-std::vector<double> thrustCurve;
-static std::vector<double> filteredData;
+std::vector<float> thrustCurve;
 
 static lv_chart_series_t * ser1;
-static lv_coord_t ui_ThrustChart1_series_1_array[] = { };
+static lv_chart_series_t * ser2;
 
-// Callback when data is sent
+// Fine Tuning variables
+float eventStartThreshold = 0.5;
+float eventStopThreshold = 0.5 ;
+int windowSize = 5; 
+std::deque<float> window;
+
+
+// Callback when data is sent to the teststand 
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   // Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
-  if (status != 0){
-    _ui_state_modify(ui_DisconnectAlert, _UI_MODIFY_STATE_REMOVE, LV_STATE_DISABLED);
-  }
-   _ui_state_modify(ui_DisconnectAlert, _UI_MODIFY_STATE_ADD, LV_STATE_DISABLED);
+  standConnected = (status == ESP_NOW_SEND_SUCCESS ? true : false);
+  if (!eventComplete){
+    if (standConnected){
+      if (lv_scr_act() != ui_LiveDataScreen){
+        lv_disp_load_scr(ui_LiveDataScreen);
+      }
+    }else{
+      lv_disp_load_scr(ui_DisconnectScreen);
+    }
+
+  } 
 }
 
 
@@ -86,13 +102,14 @@ void fire() {
 
 void setup() {
   // Initialize Serial Monitor
-  Serial.begin(115200);
+  Serial.begin(9600);
   Serial.println("Starting UI");
     
   lv_helper();
   ui_init();
 
-  ser1 = lv_chart_add_series(ui_ThrustChart1, lv_color_hex(0x808080), LV_CHART_AXIS_PRIMARY_Y);
+  ser1 = lv_chart_add_series(ui_ThrustChart1, lv_color_hex(0xE60019), LV_CHART_AXIS_PRIMARY_Y);
+  ser2 = lv_chart_add_series(ui_ThrustChartFinal, lv_color_hex(0x00FF13), LV_CHART_AXIS_PRIMARY_Y);
 
   analogWrite(38,255); // ?? What is this line doing? 
 
@@ -138,80 +155,41 @@ double GramsToNewtons(double grams){
 
 
 // Function to calculate the instantaneous rate of change
-double calculateInstantaneousRateOfChange(const std::vector<double>& data, int currentIndex) {
-  // Check if there's enough data to calculate the rate of change
-  if (currentIndex < 1 || currentIndex > data.size()) {
-    return 0.0; // Or handle the error appropriately
+float calculateInstantaneousRateOfChange(const std::deque<float>& data, int currentIndex) {
+  if (currentIndex < 1 || currentIndex > data.size() || data.empty()) {
+    return 0.0; 
   }
 
-  // Calculate the rate of change using the previous and current data points
-  double rateOfChange = (data[currentIndex] - data[currentIndex - 1]); 
+  float rateOfChange = (data[currentIndex] - data[currentIndex - 1]); 
   return rateOfChange;
 }
 
-// Function to apply a moving average filter
-std::vector<double> applyMovingAverageFilter(const std::vector<double>& data, int windowSize) {
-  for (int i = 0; i < data.size(); ++i) {
-    // Calculate the start and end indices for the averaging window
-    int start = std::max(0, i - windowSize / 2);
-    int end = std::min(static_cast<int>(data.size() - 1), i + windowSize / 2);
-
-    double sum = 0.0;
-    for (int j = start; j <= end; ++j) {
-      sum += data[j];
-    }
-
-    filteredData.push_back(sum / (end - start + 1));
-  }
-  return filteredData;
-}
 
 // Function to detect event start and stop based on rate of change
-bool detectEvent(double rateOfChange, double eventStartThreshold, double eventStopThreshold) {
+bool detectEvent(float rateOfChange, float eventStartThreshold, float eventStopThreshold) {
   // Check if the rate of change exceeds the start threshold (event begins)
   if (std::abs(rateOfChange) > eventStartThreshold) {
     eventOccurred = true; // An event has infact, occurred
     return true; // Event started
-  } 
+  }
   // Check if the rate of change falls below the stop threshold (event ends)
   else if (std::abs(rateOfChange) < eventStopThreshold) { 
     return false; // Event stopped 
   } 
   // If neither condition is met, maintain the previous state
   else {
-    static bool eventInProgress = false; // Keep track of the event state
-    return eventInProgress; 
+    static bool eventHappeningNow = false; // Keep track of the event state
+    return eventHappeningNow; 
   }
 }
-
-
-void center_chart_series(lv_obj_t * chart, lv_chart_series_t * ser) {
-  // 1. Get the minimum and maximum x-values of the data series
-  lv_coord_t min_x = 0; // Assuming x starts from 0
-  lv_coord_t max_x = lv_chart_get_point_count(chart) - 1; // Last x-value
-
-  // 2. Calculate the middle x-value
-  lv_coord_t mid_x = (min_x + max_x) / 2;
-
-  // 3. Calculate the shift needed to center the data
-  lv_coord_t shift = lv_chart_get_point_count(chart) / 2 - mid_x;
-
-  // 4. Shift the x-values of the data points
-  for (uint16_t i = 0; i < lv_chart_get_point_count(chart); i++) {
-    ser->x_points[i] += shift; 
-  }
-
-  // 5. Refresh the chart to reflect the changes
-  lv_chart_refresh(chart);
-}
-
 
 // callback function that will be executed when data is received
 void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
   lastMsg = millis();
   memcpy(&standData, incomingData, sizeof(standData));
   armed = standData.armed;
-
+  
+  // Update states
   if (armed){
     digitalWrite(armedLED, HIGH);
     digitalWrite(safeLED, LOW);
@@ -219,38 +197,60 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
     digitalWrite(armedLED, LOW);
     digitalWrite(safeLED, HIGH);
   }
-  if (eventOccurred && !eventInProgress){
+
+  // We're done here
+  if (eventComplete){
+    displayResults();
     return;
-  }
+  } 
+
+  // TODO
+  // Move this to the teststand itself 
   standData.thrust = GramsToNewtons(standData.thrust);
+
+  // Capture the peak thrust value
   if (standData.thrust > maxThrust){
     maxThrust = standData.thrust;
+    // Update the y axis range to fit the new max value
+    lv_chart_set_range(ui_ThrustChart1, LV_CHART_AXIS_PRIMARY_Y, 0, maxThrust + 0.5 );
   }
 
-  lv_chart_set_range(ui_ThrustChart1, LV_CHART_AXIS_PRIMARY_Y, 0, maxThrust + 0.5 );
-  if (standData.thrust > 0.5 ){
+
+  // Do not capture negative values 
+  if (standData.thrust >= 0 ){
     thrustCurve.push_back(standData.thrust);
   }
 
-  filteredData = applyMovingAverageFilter(thrustCurve, windowSize);
+  // Calculate the moving average of the window
+  double windowSum = std::accumulate(window.begin(), window.end(), 0.0);
+  double movingAverage = window.size() > 0 ? windowSum / window.size() : 0.0; // Handle empty window
 
-  rateOfChange = calculateInstantaneousRateOfChange(filteredData, filteredData.size());
+  // Calculate rate of change using the PREVIOUS moving average values
+  if (window.size() > 1) {
+    rateOfChange = calculateInstantaneousRateOfChange(window, window.size()-2);
+  } else {
+    rateOfChange = 0.0; // Initialize with 0 for the first iteration
+  }
+
+  // Push the new moving average into the window for the NEXT calculation
+  window.push_back(movingAverage);
+  if (window.size() > windowSize) {
+    window.pop_front();
+  }
+
+  // rateOfChange = calculateInstantaneousRateOfChange(thrustCurve, thrustCurve.size());
   eventInProgress = detectEvent(rateOfChange, eventStartThreshold, eventStopThreshold);
 
-
-  if (eventOccurred && !eventInProgress){
-    if (done){
-      return;
-    }
-    center_chart_series(ui_ThrustChart1, ser1);
-    done = true;
+  if (!eventComplete && eventOccurred && !eventInProgress){
+    eventComplete = true;
     return;
   }
 
-  if (eventInProgress && standData.thrust > 0.5){
+
+  if (!eventComplete && eventOccurred){
 
     String max_string = String(maxThrust);
-    _ui_label_set_property(ui_MaxThrustValue, _UI_LABEL_PROPERTY_TEXT, String(max_string + " g").c_str());
+    _ui_label_set_property(ui_MaxThrustValue, _UI_LABEL_PROPERTY_TEXT, String(max_string + " n").c_str());
     lv_chart_set_next_value(ui_ThrustChart1, ser1, standData.thrust);
     String avg_string = String(avgThrust);
     String impulse_string = String (totalImpulse);
@@ -258,13 +258,39 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
     avgThrust = std::accumulate(thrustCurve.begin(), thrustCurve.end(), 0.0) / thrustCurve.size();
     totalImpulse = std::accumulate(thrustCurve.begin(), thrustCurve.end(), 0.0) * 0.1;
 
-    _ui_label_set_property(ui_AvgThrustValue, _UI_LABEL_PROPERTY_TEXT, String(avg_string + " g").c_str());
+    _ui_label_set_property(ui_AvgThrustValue, _UI_LABEL_PROPERTY_TEXT, String(avg_string + " n").c_str());
     _ui_label_set_property(ui_ImpulseValue, _UI_LABEL_PROPERTY_TEXT, String(impulse_string + " N-s").c_str());
   }
 }
 
 
+void displayResults(){
+  static bool resultsDisplayed = false;
+  if (resultsDisplayed){
+    return;
+  }
+  resultsDisplayed = true;
+  // lv_scr_load_anim(ui_ResultsScreen, LV_SCR_LOAD_ANIM_FADE_ON, 250, 0, false);
+  lv_disp_load_scr(ui_ResultsScreen);
+  lv_chart_set_range(ui_ThrustChartFinal, LV_CHART_AXIS_PRIMARY_Y, 0, maxThrust + 0.5 );
+  short int arr[thrustCurve.size()];
+  transform(thrustCurve.begin(),thrustCurve.end(),arr,[](const int & x){return x;});
+  lv_chart_set_ext_y_array(ui_ThrustChartFinal, ser2, arr);
+  lv_chart_refresh(ui_ThrustChartFinal);
+  String max_string = String(maxThrust);
+  String avg_string = String(avgThrust);
+  String impulse_string = String(totalImpulse);
+  String duration_string = String(float (thrustCurve.size() / 100));
+  _ui_label_set_property(ui_MaxThrustValueFinal, _UI_LABEL_PROPERTY_TEXT, String(max_string + " N").c_str());
+  _ui_label_set_property(ui_AvgThrustValueFinal, _UI_LABEL_PROPERTY_TEXT, String(avg_string + " N").c_str());
+  _ui_label_set_property(ui_ImpulseValueFinal, _UI_LABEL_PROPERTY_TEXT, String(impulse_string + " N-sec").c_str());
+  _ui_label_set_property(ui_BurnDurationValue, _UI_LABEL_PROPERTY_TEXT, String(duration_string + " sec").c_str());
+  _ui_label_set_property(ui_MotorClassificationValue, _UI_LABEL_PROPERTY_TEXT, String("E56").c_str());
+
+}
+
 void loop() {
+  Serial.println("eventComplete:" + String(eventComplete) + "\nEvent:" + String(eventInProgress) + "\nOccur:" + String(eventOccurred) + "\nRate:" + String(std::abs(rateOfChange)) + "\nThrust:" + String(standData.thrust));
   if (millis() - debounce > 250 ){
     if (digitalRead(armingButton) == 0) {
       toggle_arm();
